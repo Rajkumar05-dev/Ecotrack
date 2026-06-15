@@ -43,4 +43,17 @@ public class UserServiceImpl implements UserService {
 		return savedDto;
 	}
 
+	@Override
+	public UserDto createAdmin(UserDto userDto) {
+		userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));
+		User user = modelMapper.map(userDto, User.class);
+
+		Role role = roleRepository.findByAppRole(AppRole.ROLE_ADMIN)
+				.orElseThrow(() -> new NotFoundException("Role not found"));
+		user.setRole(role);
+		User savedUser = userRespository.save(user);
+
+		return modelMapper.map(savedUser, UserDto.class);
+	}
+
 }

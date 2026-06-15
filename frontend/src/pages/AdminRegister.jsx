@@ -142,7 +142,7 @@ const AdminRegister = () => {
 
     try {
       // In a real scenario, you'd send the adminCode to backend for verification
-      await api.register(name, email, password, phoneNo);
+      await api.registerAdmin(name, email, password, phoneNo, adminCode);
       setSuccess('Admin account created successfully! Redirecting to login...');
       setTimeout(() => {
         navigate('/admin-login');

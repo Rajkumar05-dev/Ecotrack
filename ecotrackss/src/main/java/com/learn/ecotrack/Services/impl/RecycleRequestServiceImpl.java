@@ -81,4 +81,20 @@ RecycleRequest	saved	=recycleRequestRepository.save(request);
 		return dtoList;
 	}
 
+	@Override
+	public java.util.List<RecycleRequestDto> getAllRequests() {
+		java.util.List<RecycleRequest> list = recycleRequestRepository.findAll();
+		java.util.List<RecycleRequestDto> dtoList = new java.util.ArrayList<>();
+		for (RecycleRequest r : list) {
+			dtoList.add(modelMapper.map(r, RecycleRequestDto.class));
+		}
+		return dtoList;
+	}
+
+	@Override
+	public void deleteRequest(int requestId) {
+		RecycleRequest request = recycleRequestRepository.findById(requestId).orElseThrow(()->new NotFoundException("Request not found"));
+		recycleRequestRepository.delete(request);
+	}
+
 }

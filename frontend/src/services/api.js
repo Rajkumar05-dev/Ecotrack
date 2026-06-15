@@ -1,5 +1,13 @@
 const API_BASE_URL = 'http://localhost:8080';
 
+const getRequestImageUrl = (imageName) => {
+  if (!imageName) return '';
+  if (/^(https?:|data:|blob:)/i.test(imageName)) return imageName;
+
+  const cleanName = String(imageName).split(/[\\/]/).pop();
+  return `${API_BASE_URL}/request/image/${encodeURIComponent(cleanName)}`;
+};
+
 // Mock Data Store for fallback when backend is offline
 const mockData = {
   users: [
@@ -35,6 +43,14 @@ const mockData = {
       name: 'Rocky Admin',
       email: 'rocky527@gmail.com',
       phoneNo: '9988776655',
+      role: { roleId: 2, appRole: 'ROLE_ADMIN' },
+      recycleRequests: []
+    },
+    {
+      id: 'mock-admin-id-rock123',
+      name: 'ROCK123',
+      email: 'rock123@gami.com',
+      phoneNo: '9876543210',
       role: { roleId: 2, appRole: 'ROLE_ADMIN' },
       recycleRequests: []
     }
@@ -166,19 +182,20 @@ const handleMockRequest = (endpoint, options) => {
       }
 
       // 2. Register Endpoint
-      if (endpoint === '/users/register' && options.method === 'POST') {
+      if ((endpoint === '/users/register' || endpoint === '/users/register-admin') && options.method === 'POST') {
         const body = JSON.parse(options.body);
         const exists = mockData.users.some(u => u.email === body.email);
         if (exists) {
           reject(new Error('Email already exists'));
           return;
         }
+        const isAdminRegistration = endpoint === '/users/register-admin';
         const newUser = {
           id: 'mock-user-' + Date.now(),
           name: body.name || 'New User',
           email: body.email,
           phoneNo: body.phoneNo || '',
-          role: { roleId: 1, appRole: 'ROLE_USER' },
+          role: { roleId: isAdminRegistration ? 2 : 1, appRole: isAdminRegistration ? 'ROLE_ADMIN' : 'ROLE_USER' },
           recycleRequests: []
         };
         mockData.users.push(newUser);
@@ -326,6 +343,18 @@ const handleMockRequest = (endpoint, options) => {
         return;
       }
 
+      if (endpoint.startsWith('/request/') && options.method === 'DELETE') {
+        const id = parseInt(endpoint.split('/').pop());
+        mockData.requests = mockData.requests.filter(r => r.id !== id);
+        mockData.users.forEach(u => {
+          if (u.recycleRequests) {
+            u.recycleRequests = u.recycleRequests.filter(r => r.id !== id);
+          }
+        });
+        resolve({ Message: `${id}-request deleted` });
+        return;
+      }
+
       // 7. Enrollment / Payments
       if (endpoint.startsWith('/enroll/') && options.method === 'POST') {
         // POST /enroll/{userId}/enroll/{workShopId}
@@ -383,6 +412,11 @@ export const api = {
     body: JSON.stringify({ name, email, password, phoneNo })
   }),
 
+  registerAdmin: (name, email, password, phoneNo, adminCode) => request('/users/register-admin', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password, phoneNo, adminCode })
+  }),
+
   // Workshops — pass large pageSize so all are returned; Spring Page response is unwrapped automatically
   getWorkshops: () => request('/workshops?pageNumber=0&pageSize=100').then(data => {
     // Spring's Page<T> wraps items in a 'content' array; handle both plain array and Page object
@@ -423,8 +457,16 @@ export const api = {
       method: 'POST',
       headers: getAuthHeaders(),
       body: formData
-    }).then(res => res.json());
+    }).then(async res => {
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Image upload failed');
+      }
+      return res.json();
+    });
   },
+
+  getRequestImageUrl,
 
   approveRecycleRequest: (id) => request(`/request/approve/${id}`, {
     method: 'PUT'
@@ -434,6 +476,10 @@ export const api = {
 
   rejectRecycleRequest: (id, reason) => request(`/request/reject/${id}?reason=${encodeURIComponent(reason)}`, {
     method: 'PUT'
+  }),
+
+  deleteRecycleRequest: (id) => request(`/request/${id}`, {
+    method: 'DELETE'
   }),
 
   // Admin special endpoints

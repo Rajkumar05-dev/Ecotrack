@@ -81,7 +81,9 @@ const Navbar = () => {
         <Link to="/workshops" className="nav-link" style={linkStyle}>Workshops</Link>
         {user ? (
           <>
-            <Link to="/dashboard" className="nav-link" style={linkStyle}>Dashboard</Link>
+            <Link to={isAdmin ? '/admin-dashboard' : '/dashboard'} className="nav-link" style={linkStyle}>
+              {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
+            </Link>
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: '10px' }}>
               <div style={{
                 display: 'flex',
@@ -144,7 +146,9 @@ const Navbar = () => {
           <Link to="/workshops" style={mobileLinkStyle} onClick={() => setMobileMenuOpen(false)}>Workshops</Link>
           {user ? (
             <>
-              <Link to="/dashboard" style={mobileLinkStyle} onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
+              <Link to={isAdmin ? '/admin-dashboard' : '/dashboard'} style={mobileLinkStyle} onClick={() => setMobileMenuOpen(false)}>
+                {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
+              </Link>
               <div style={{
                 padding: '12px 0',
                 borderTop: '1px solid var(--dark-border)',

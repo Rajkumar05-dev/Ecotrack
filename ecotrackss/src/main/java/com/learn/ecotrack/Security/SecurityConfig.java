@@ -48,12 +48,15 @@ public class SecurityConfig {
 
 				// 🔐 Authorization
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers(HttpMethod.POST,"/users/register","/auth/login").permitAll()
+						.requestMatchers(HttpMethod.POST,"/users/register","/users/register-admin","/auth/login").permitAll()
 						.requestMatchers(HttpMethod.GET,"/workshops/**","/users/exists").permitAll()
+						.requestMatchers(HttpMethod.GET,"/request/image/**").permitAll()
+						.requestMatchers(HttpMethod.GET,"/request").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.POST,"/workshops").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.PUT,"/workshops/**",
 								"/request/approve/**","/request/reject/**")
 						.hasRole("ADMIN")
+						.requestMatchers(HttpMethod.DELETE,"/request/**").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.DELETE,"/workshops/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
 

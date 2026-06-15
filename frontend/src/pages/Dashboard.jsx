@@ -623,7 +623,7 @@ const Dashboard = () => {
 
                           {req.itemImage && (
                             <div style={{ width: '100px', height: '60px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', margin: '10px 0', border: '1px solid var(--dark-border)' }}>
-                              <img src={req.itemImage} alt="Pickup waste item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={api.getRequestImageUrl(req.itemImage)} alt="Pickup waste item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                           )}
 
@@ -726,7 +726,7 @@ const Dashboard = () => {
                         {/* Image for admin verification */}
                         {req.itemImage && (
                           <div style={{ width: '150px', height: '100px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--dark-border)' }}>
-                            <img src={req.itemImage} alt="waste check" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={api.getRequestImageUrl(req.itemImage)} alt="waste check" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         )}
                       </div>

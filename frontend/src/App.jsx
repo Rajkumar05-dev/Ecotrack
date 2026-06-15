@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import AdminLogin from './pages/AdminLogin';
 import AdminRegister from './pages/AdminRegister';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import Workshops from './pages/Workshops';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -78,11 +79,22 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     const roleString = user.role?.appRole || '';
     const hasRole = allowedRoles.some(role => roleString.includes(role));
     if (!hasRole) {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/admin-login" replace />;
     }
   }
 
   return children;
+};
+
+const DashboardRoute = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.appRole?.includes('ADMIN');
+
+  if (isAdmin) {
+    return <Navigate to="/admin-dashboard" replace />;
+  }
+
+  return <Dashboard />;
 };
 
 function App() {
@@ -108,7 +120,7 @@ function App() {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardRoute />
                   </ProtectedRoute>
                 } 
               />
@@ -118,7 +130,7 @@ function App() {
                 path="/admin-dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['ADMIN']}>
-                    <Dashboard />
+                    <AdminDashboard />
                   </ProtectedRoute>
                 } 
               />

@@ -6,5 +6,6 @@ public interface UserService {
 
 	
 UserDto	createUser(UserDto userDto);
+UserDto	createAdmin(UserDto userDto);
 	
 }

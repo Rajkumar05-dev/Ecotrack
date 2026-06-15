@@ -24,12 +24,12 @@ public class FileserviceImple implements FileService {
 		String fileName = UUID.randomUUID().toString();
 		String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
 		 String newName=fileName+extension;
-		 if(extension.equalsIgnoreCase(".png")||extension.equalsIgnoreCase(".pjeg")||extension.equalsIgnoreCase(".jpg")) {
+		 if(extension.equalsIgnoreCase(".png")||extension.equalsIgnoreCase(".jpeg")||extension.equalsIgnoreCase(".jpg")) {
 			 File folder = new File(path);
 			 if(!folder.exists()) {
 				 folder.mkdirs();
 			 }
-			 Files.copy(multipartFile.getInputStream(), Paths.get(path+newName));
+			 Files.copy(multipartFile.getInputStream(), Paths.get(path, newName));
 			 
 		 }else {
 			 throw new RuntimeException("file  with"+extension+"is not allowed ");
@@ -39,7 +39,7 @@ public class FileserviceImple implements FileService {
 
 	@Override
 	public InputStream getResource(String path, String name) throws FileNotFoundException {
-		InputStream inputStream = new FileInputStream(path+name);
+		InputStream inputStream = new FileInputStream(Paths.get(path, name).toFile());
 		return inputStream;
 	}
 

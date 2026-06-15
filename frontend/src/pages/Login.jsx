@@ -25,7 +25,8 @@ const Login = () => {
     try {
       const response = await api.login(email, password);
       loginSession(response.token, response.userDto);
-      navigate('/dashboard');
+      const isAdmin = response.userDto?.role?.appRole?.includes('ADMIN');
+      navigate(isAdmin ? '/admin-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Invalid email or password.');
     } finally {

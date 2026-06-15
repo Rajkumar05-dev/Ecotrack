@@ -71,6 +71,12 @@ const AdminLogin = () => {
 
     try {
       const response = await api.login(email, password);
+      const isAdmin = response.userDto?.role?.appRole?.includes('ADMIN');
+
+      if (!isAdmin) {
+        setError('This account is not an admin account. Please use Admin Registration or login with an admin user.');
+        return;
+      }
       
       loginSession(response.token, response.userDto);
       navigate('/admin-dashboard');

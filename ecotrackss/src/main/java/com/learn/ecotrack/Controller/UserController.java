@@ -21,4 +21,9 @@ public class UserController {
  public ResponseEntity<UserDto> register(@RequestBody UserDto userDto ){
 	 return new ResponseEntity<UserDto>(userService.createUser(userDto),HttpStatus.CREATED);
  }
+
+	@PostMapping("/register-admin")
+ public ResponseEntity<UserDto> registerAdmin(@RequestBody UserDto userDto ){
+	 return new ResponseEntity<UserDto>(userService.createAdmin(userDto),HttpStatus.CREATED);
+ }
 }
