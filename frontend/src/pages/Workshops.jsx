@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import WorkshopCard from '../components/WorkshopCard';
-import { Plus, X, Search, Calendar, Landmark, BookOpen, AlertCircle, Loader } from 'lucide-react';
+import { Plus, X, Search, BookOpen, Loader } from 'lucide-react';
 
 const Workshops = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [workshopsError, setWorkshopsError] = useState('');
   const [search, setSearch] = useState('');
-  
-  // Simulated Payment Modal State
-  const [activeOrder, setActiveOrder] = useState(null);
-  const [activeWorkshop, setActiveWorkshop] = useState(null);
-  const [simulatingPayment, setSimulatingPayment] = useState(false);
-  const [enrolledIds, setEnrolledIds] = useState([]);
+  const [bookingError, setBookingError] = useState('');
+  const [bookingNeedsLogin, setBookingNeedsLogin] = useState(false);
+  const [enrollmentState, setEnrollmentState] = useState({ userId: null, ids: [] });
+  const enrolledIds = enrollmentState.userId === user?.id ? enrollmentState.ids : [];
+  const enrollmentsLoading = Boolean(user?.id) && enrollmentState.userId !== user.id;
 
   // Create / Edit Workshop Modal State
   const [showFormModal, setShowFormModal] = useState(false);
@@ -33,58 +33,95 @@ const Workshops = () => {
 
   const isAdmin = user?.role?.appRole?.includes('ADMIN');
 
-  useEffect(() => {
-    fetchWorkshops();
-    
-    // Load enrolled workshops from localStorage/user details
-    if (user?.id) {
-      const savedEnrolled = localStorage.getItem(`enrolled_ws_${user.id}`);
-      if (savedEnrolled) {
-        setEnrolledIds(JSON.parse(savedEnrolled));
-      }
-    }
-  }, [user]);
-
-  const fetchWorkshops = async () => {
+  const fetchWorkshops = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await api.getWorkshops();
       setWorkshops(data);
+      setWorkshopsError('');
     } catch (err) {
-      console.error('Error fetching workshops:', err);
+      setWorkshopsError(err.message || 'Unable to load workshops.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      fetchWorkshops();
+    });
+  }, [fetchWorkshops]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    let active = true;
+    api.getUserEnrollments(user.id)
+      .then((enrollments) => {
+        if (!active) return;
+        const paidWorkshopIds = enrollments
+          .filter((enrollment) => enrollment.paymentStatus === 'SUCCESS')
+          .map((enrollment) => enrollment.workShop?.id)
+          .filter((workshopId) => Number.isInteger(workshopId));
+        setEnrollmentState({ userId: user.id, ids: paidWorkshopIds });
+        localStorage.setItem(`enrolled_ws_${user.id}`, JSON.stringify(paidWorkshopIds));
+      })
+      .catch((error) => {
+        console.error('Unable to load workshop enrollments:', error);
+        if (active) setEnrollmentState({ userId: user.id, ids: [] });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   const handleEnroll = async (workshop) => {
     if (!user) {
-      navigate('/login');
+      setBookingNeedsLogin(true);
+      setBookingError('Sign in to book a workshop.');
       return;
     }
 
+    if (!localStorage.getItem('ecotrack_token')) {
+      setBookingNeedsLogin(true);
+      setBookingError('Your login token is missing. Sign in again to continue booking.');
+      return;
+    }
+
+    setBookingError('');
+    setBookingNeedsLogin(false);
     try {
       // Step 1: Request enrollment from backend (creates Razorpay order)
       const order = await api.enrollInWorkshop(user.id, workshop.id);
-      setActiveOrder(order);
-      setActiveWorkshop(workshop);
+      if (!order?.razorpayOrderId) {
+        throw new Error('The payment order could not be created.');
+      }
 
-      // Step 2: Load Razorpay JS and the public key from backend
-      const [config, rzpLoaded] = await Promise.all([
-        api.getRazorpayKey().catch(() => ({ key: 'rzp_test_S060WMnc2eFoWe' })),
-        loadRazorpayScript()
-      ]);
-      const key = config?.key || 'rzp_test_S060WMnc2eFoWe';
       const isMockOrder = order.razorpayOrderId?.startsWith('mock_');
 
-      console.log('Razorpay init:', { rzpLoaded, hasRazorpay: !!window.Razorpay, orderId: order.razorpayOrderId, isMockOrder, key });
-      if (rzpLoaded && window.Razorpay && !isMockOrder && order.razorpayOrderId) {
-        openRazorpaySDK(order, workshop, key);
-      } else {
-        console.log("Razorpay unavailable; showing simulated payment modal...");
+      if (isMockOrder) {
+        throw new Error('A real payment order was not created. Please check the backend configuration and try again.');
       }
+      if (!Number.isSafeInteger(Math.round(Number(order.amount) * 100)) || Number(order.amount) <= 0) {
+        throw new Error('The payment order has an invalid amount.');
+      }
+
+      const [config, rzpLoaded] = await Promise.all([
+        api.getRazorpayKey(),
+        loadRazorpayScript()
+      ]);
+      if (!config?.key || !rzpLoaded || !window.Razorpay) {
+        throw new Error('Razorpay checkout is unavailable. Please try again later.');
+      }
+
+      openRazorpaySDK(order, workshop, config.key);
     } catch (err) {
-      alert('Failed to initiate enrollment: ' + err.message);
+      if (err.status === 401) {
+        setBookingNeedsLogin(true);
+        setBookingError('The backend rejected your login token. Sign in again, then retry booking. If this happens immediately after signing in, restart the backend so it uses the current JWT secret.');
+        return;
+      }
+      setBookingError('Failed to initiate enrollment: ' + err.message);
     }
   };
 
@@ -98,7 +135,11 @@ const Workshops = () => {
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
+      script.onerror = () => {
+        script.remove();
+        resolve(false);
+      };
+      script.async = true;
       document.body.appendChild(script);
     });
   };
@@ -106,8 +147,8 @@ const Workshops = () => {
   // Open the real Razorpay payment window
   const openRazorpaySDK = (order, workshop, key) => {
     const options = {
-      key: key || "rzp_test_S060WMnc2eFoWe",
-      amount: order.amount * 100,
+      key,
+      amount: Math.round(Number(order.amount) * 100),
       currency: "INR",
       name: "EcoTrack",
       description: `Enroll: ${workshop.name}`,
@@ -121,10 +162,8 @@ const Workshops = () => {
           );
           completeEnrollmentLocal(workshop.id);
           alert('Successfully Registered for Workshop!');
-          setActiveOrder(null);
-          setActiveWorkshop(null);
         } catch (err) {
-          alert('Verification failed: ' + err.message);
+          setBookingError('Payment verification failed: ' + err.message);
         }
       },
       prefill: {
@@ -135,16 +174,31 @@ const Workshops = () => {
       theme: {
         color: "#10b981"
       },
-      modal: {
-        ondismiss: function() {
-          setActiveOrder(null);
-          setActiveWorkshop(null);
-        }
-      }
     };
 
     try {
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response) => {
+        const error = response.error || {};
+        const diagnostics = {
+          code: error.code,
+          reason: error.reason,
+          source: error.source,
+          step: error.step
+        };
+        console.error('Razorpay payment failed', diagnostics);
+
+        const details = [
+          error.code && `Code: ${error.code}`,
+          error.reason && `Reason: ${error.reason}`,
+          error.step && `Step: ${error.step}`,
+          error.source && `Source: ${error.source}`
+        ].filter(Boolean);
+        alert([
+          error.description || 'Payment could not be completed.',
+          details.length ? details.join('\n') : ''
+        ].filter(Boolean).join('\n\n'));
+      });
       rzp.open();
     } catch (error) {
       console.error('Unable to initialize Razorpay checkout', error);
@@ -152,32 +206,9 @@ const Workshops = () => {
     }
   };
 
-  const handleSimulatePayment = async (order = activeOrder, workshop = activeWorkshop) => {
-    if (!order || !workshop) {
-      alert('Unable to simulate payment: missing order or workshop details.');
-      return;
-    }
-
-    setSimulatingPayment(true);
-    // Simulate API roundtrip
-    setTimeout(async () => {
-      try {
-        await api.confirmEnrollment(order.razorpayOrderId, 'pay_mock_' + Date.now(), 'sig_mock_' + Date.now());
-        completeEnrollmentLocal(workshop.id);
-        alert(`Booking confirmed for "${workshop.name}"!`);
-      } catch (err) {
-        alert('Simulated booking failed: ' + err.message);
-      } finally {
-        setSimulatingPayment(false);
-        setActiveOrder(null);
-        setActiveWorkshop(null);
-      }
-    }, 1500);
-  };
-
   const completeEnrollmentLocal = (wsId) => {
-    const updatedIds = [...enrolledIds, wsId];
-    setEnrolledIds(updatedIds);
+    const updatedIds = [...new Set([...enrolledIds, wsId])];
+    setEnrollmentState({ userId: user.id, ids: updatedIds });
     if (user?.id) {
       localStorage.setItem(`enrolled_ws_${user.id}`, JSON.stringify(updatedIds));
     }
@@ -316,10 +347,52 @@ const Workshops = () => {
         />
       </div>
 
+      {bookingError && (
+        <div role="alert" style={{
+          marginBottom: '24px',
+          padding: '14px 18px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          background: 'rgba(239, 68, 68, 0.1)',
+          color: 'var(--danger)'
+        }}>
+          {bookingError}
+          {bookingNeedsLogin && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate('/login', {
+                state: { from: '/workshops' }
+              })}
+              style={{ marginLeft: '12px' }}
+            >
+              Sign in
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: '16px', color: 'var(--text-secondary-dark)' }}>
           <Loader size={40} className="spin" />
           <span>Loading Workshops...</span>
+        </div>
+      ) : workshopsError ? (
+        <div role="alert" className="glass" style={{
+          textAlign: 'center',
+          padding: '48px 32px',
+          borderRadius: 'var(--radius-lg)',
+          color: 'var(--text-secondary-dark)'
+        }}>
+          <h3 style={{ color: 'var(--danger)' }}>Workshops are temporarily unavailable</h3>
+          <p>{workshopsError}</p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={fetchWorkshops}
+          >
+            Retry
+          </button>
         </div>
       ) : filteredWorkshops.length === 0 ? (
         <div className="glass" style={{
@@ -345,78 +418,9 @@ const Workshops = () => {
               onEdit={handleOpenEditModal}
               onDelete={handleDelete}
               isEnrolled={enrolledIds.includes(ws.id)}
+              isEnrollmentLoading={enrollmentsLoading}
             />
           ))}
-        </div>
-      )}
-
-      {/* Simulated Payment Dialog Modal */}
-      {activeOrder && (
-        <div className="modal-overlay">
-          <div className="glass modal-content" style={{ maxWidth: '450px' }}>
-            <button 
-              onClick={() => { setActiveOrder(null); setActiveWorkshop(null); }}
-              style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-secondary-dark)', cursor: 'pointer' }}
-            >
-              <X size={20} />
-            </button>
-
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{
-                display: 'inline-flex',
-                background: 'rgba(45, 212, 191, 0.1)',
-                padding: '12px',
-                borderRadius: '50%',
-                marginBottom: '15px'
-              }}>
-                <Landmark size={28} color="var(--secondary)" />
-              </div>
-              <h3 style={{ fontSize: '1.5rem', color: '#fff', marginBottom: '8px' }}>Simulated Checkout</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary-dark)', margin: 0 }}>
-                We detected that Razorpay is running in Mock Sandbox or Offline mode.
-              </p>
-            </div>
-
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid var(--dark-border)',
-              borderRadius: 'var(--radius-md)',
-              padding: '20px',
-              marginBottom: '24px',
-              fontSize: '0.9rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary-dark)' }}>Workshop:</span>
-                <strong style={{ color: '#fff' }}>{activeWorkshop?.name}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary-dark)' }}>Order ID:</span>
-                <span style={{ fontFamily: 'monospace' }}>{activeOrder.razorpayOrderId}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--dark-border)', paddingTop: '10px', marginTop: '5px' }}>
-                <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 600 }}>Amount Due:</span>
-                <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>₹{activeOrder.amount}</strong>
-              </div>
-            </div>
-
-            <button 
-              onClick={handleSimulatePayment} 
-              className="btn btn-primary" 
-              style={{ width: '100%', padding: '14px' }}
-              disabled={simulatingPayment}
-            >
-              {simulatingPayment ? (
-                <>
-                  <Loader size={16} className="spin" /> Verifying Mock Transaction...
-                </>
-              ) : (
-                'Pay Simulated ₹' + activeOrder.amount
-              )}
-            </button>
-          </div>
         </div>
       )}
 

@@ -8,7 +8,7 @@ import java.util.Optional;
 
 
 public interface EnrollmentRepository extends JpaRepository<Enrollments, Integer> {
-  boolean existsByUserIdAndWorkShopId(String userId,int workShopId);
+  Optional<Enrollments> findByUserIdAndWorkShopId(String userId, int workShopId);
   Optional<Enrollments> findByRazorpayOrderId(String razorpayOrderId);
   List<Enrollments> findByUserIdOrderByEnrolledAtDesc(String userId);
 }

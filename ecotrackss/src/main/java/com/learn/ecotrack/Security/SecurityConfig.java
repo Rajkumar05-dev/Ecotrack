@@ -15,6 +15,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
+import jakarta.servlet.DispatcherType;
+
 import com.learn.ecotrack.Security.jwt.AuthEntryPointJwt;
 import com.learn.ecotrack.Security.jwt.AuthTokenFilter;
 
@@ -48,8 +50,11 @@ public class SecurityConfig {
 
 				// 🔐 Authorization
 				.authorizeHttpRequests(auth -> auth
+						.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 						.requestMatchers(HttpMethod.POST,"/users/register","/users/register-admin","/auth/login").permitAll()
 						.requestMatchers(HttpMethod.GET,"/workshops/**","/users/exists").permitAll()
+						.requestMatchers(HttpMethod.GET,"/payment/config").permitAll()
+						.requestMatchers(HttpMethod.POST,"/enroll/confirm").permitAll()
 						.requestMatchers(HttpMethod.GET,"/request/image/**").permitAll()
 						.requestMatchers(HttpMethod.GET,"/request").hasRole("ADMIN")
 						.requestMatchers(HttpMethod.POST,"/workshops").hasRole("ADMIN")

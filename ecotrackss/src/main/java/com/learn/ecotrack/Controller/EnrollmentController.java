@@ -49,13 +49,26 @@ public class EnrollmentController {
 
 	@PostMapping("/confirm")
 	public ResponseEntity<String> confirmEnrollment(@RequestBody Map<String, String> payload)  throws RazorpayException {
-		boolean verified = razorpayService.verifyPayment(payload.get("razorpayOrderId"), payload.get("razorpayPaymentId"), payload.get("razorpaySignature"));
+		if (payload == null) {
+			return ResponseEntity.badRequest().body("Payment verification details are required");
+		}
+
+		String orderId = payload.get("razorpayOrderId");
+		String paymentId = payload.get("razorpayPaymentId");
+		String signature = payload.get("razorpaySignature");
+		if (orderId == null || orderId.isBlank()
+				|| paymentId == null || paymentId.isBlank()
+				|| signature == null || signature.isBlank()) {
+			return ResponseEntity.badRequest().body("Payment verification details are required");
+		}
+
+		boolean verified = razorpayService.verifyPayment(orderId, paymentId, signature);
 		
 		if(!verified) {
-			return ResponseEntity.badRequest().body("Payment Varification Failed");
+			return ResponseEntity.badRequest().body("Payment verification failed");
 		}
 		
-		enrollmentService.ConfrimPayment(payload.get("razorpayOrderId"), payload.get("razorpayPaymentId"));
+		enrollmentService.ConfrimPayment(orderId, paymentId);
 		return ResponseEntity.ok("Enrollment succesfull");
 	}
 }

@@ -24,7 +24,7 @@ public class RazorpayServiceImpl  implements RazorpayService {
 		RazorpayClient client = new RazorpayClient(keyId,keySecret);
 		
 		JSONObject options = new JSONObject();
-		options.put("amount", amount * 100);
+		options.put("amount", Math.round(amount * 100));
 		options.put("currency", "INR");
 		options.put("receipt", "enroll_"+System.currentTimeMillis());
 		return client.orders.create(options);

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -16,7 +16,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { api } from '../services/api';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 
 const emptyWorkshopForm = {
   name: '',
@@ -50,18 +50,13 @@ const AdminDashboard = () => {
   const [savingWorkshop, setSavingWorkshop] = useState(false);
   const [processingRequestId, setProcessingRequestId] = useState(null);
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     try {
-      setLoading(true);
-      setError('');
       const [requestData, workshopData] = await Promise.all([
         api.getAllRecycleRequestsAdmin(),
         api.getWorkshops()
       ]);
+      setError('');
       setRequests(Array.isArray(requestData) ? requestData : []);
       setWorkshops(Array.isArray(workshopData) ? workshopData : []);
     } catch (err) {
@@ -69,7 +64,13 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      loadAdminData();
+    });
+  }, [loadAdminData]);
 
   const metrics = useMemo(() => {
     const approved = requests.filter((request) => request.requestStatus === 'APPROVED');

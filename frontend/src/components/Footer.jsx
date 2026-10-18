@@ -1,4 +1,3 @@
-import React from 'react';
 import { Leaf, Mail, Globe } from 'lucide-react';
 
 const Footer = () => {

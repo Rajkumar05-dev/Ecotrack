@@ -1,7 +1,6 @@
-import React from 'react';
 import { Calendar, Clock, MapPin, DollarSign, Edit, Trash } from 'lucide-react';
 
-const WorkshopCard = ({ workshop, onEnroll, isAdmin, onEdit, onDelete, isEnrolled }) => {
+const WorkshopCard = ({ workshop, onEnroll, isAdmin, onEdit, onDelete, isEnrolled, isEnrollmentLoading }) => {
   const formattedDate = workshop.registrationDate
     ? new Date(workshop.registrationDate).toLocaleDateString(undefined, {
         year: 'numeric',
@@ -140,8 +139,9 @@ const WorkshopCard = ({ workshop, onEnroll, isAdmin, onEdit, onDelete, isEnrolle
               onClick={() => onEnroll(workshop)} 
               className="btn btn-primary" 
               style={{ width: '100%', padding: '12px' }}
+              disabled={isEnrollmentLoading}
             >
-              Book Seat
+              {isEnrollmentLoading ? 'Checking booking...' : 'Book Seat'}
             </button>
           )}
         </div>

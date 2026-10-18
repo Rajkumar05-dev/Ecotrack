@@ -106,10 +106,23 @@ const getAuthHeaders = () => {
 
 // Auto-detector for backend availability
 let useMock = false;
+const isPaymentEndpoint = (endpoint) => endpoint.startsWith('/enroll/') || endpoint.startsWith('/payment/');
+const requiresBackend = (endpoint) =>
+  endpoint.startsWith('/auth/') ||
+  endpoint === '/users/register' ||
+  endpoint === '/users/register-admin' ||
+  endpoint.startsWith('/workshops') ||
+  isPaymentEndpoint(endpoint);
 
 const request = async (endpoint, options = {}) => {
-  if (useMock) {
+  if (useMock && !requiresBackend(endpoint)) {
     return handleMockRequest(endpoint, options);
+  }
+
+  if (isPaymentEndpoint(endpoint) && localStorage.getItem('ecotrack_token')?.startsWith('mock-')) {
+    const error = new Error('You are signed in with a demo account. Sign in with your backend account before making a payment.');
+    error.status = 401;
+    throw error;
   }
 
   try {
@@ -124,7 +137,17 @@ const request = async (endpoint, options = {}) => {
     
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(errText || `Request failed with status ${response.status}`);
+      let message = errText;
+      try {
+        const payload = JSON.parse(errText);
+        message = payload.errorMessage || payload.message || payload.error || errText;
+      } catch {
+        // Keep the backend response text when it is not JSON.
+      }
+
+      const error = new Error(message || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     
     // Some endpoints return empty body or strings
@@ -134,12 +157,16 @@ const request = async (endpoint, options = {}) => {
     }
     return await response.text();
   } catch (error) {
-    console.warn(`Backend connection failed for endpoint ${endpoint}. Falling back to mock implementation. Error:`, error.message);
-    // Switch to mock for this session if it is a network error
-    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+    if (error instanceof TypeError) {
+      if (requiresBackend(endpoint)) {
+        throw new Error('The backend is unavailable. Start the backend and try again.', { cause: error });
+      }
+
+      console.warn(`Backend connection failed for endpoint ${endpoint}. Falling back to mock implementation. Error:`, error.message);
       useMock = true;
+      return handleMockRequest(endpoint, options);
     }
-    return handleMockRequest(endpoint, options);
+    throw error;
   }
 };
 
@@ -151,7 +178,7 @@ const handleMockRequest = (endpoint, options) => {
     setTimeout(() => {
       // 1. Auth Endpoint
       if (endpoint === '/auth/login' && options.method === 'POST') {
-        const { email, password } = JSON.parse(options.body);
+        const { email } = JSON.parse(options.body);
         const user = mockData.users.find(u => u.email === email);
         if (user) {
           resolve({
@@ -359,6 +386,18 @@ const handleMockRequest = (endpoint, options) => {
       if (endpoint.startsWith('/enroll/') && options.method === 'POST') {
         // POST /enroll/{userId}/enroll/{workShopId}
         if (endpoint.includes('/confirm')) {
+          const { razorpayOrderId, razorpayPaymentId } = JSON.parse(options.body);
+          const enrollment = mockData.enrollments.find(
+            item => item.razorpayOrderId === razorpayOrderId
+          );
+
+          if (!enrollment) {
+            reject(new Error('Enrollment not found'));
+            return;
+          }
+
+          enrollment.razorpayPaymentId = razorpayPaymentId;
+          enrollment.paymentStatus = 'SUCCESS';
           resolve('Enrollment succesfull');
           return;
         }

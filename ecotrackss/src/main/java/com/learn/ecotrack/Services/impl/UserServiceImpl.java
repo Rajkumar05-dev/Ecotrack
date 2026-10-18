@@ -2,8 +2,10 @@ package com.learn.ecotrack.Services.impl;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.learn.ecotrack.Dtos.UserDto;
 import com.learn.ecotrack.Entities.Role;
@@ -28,7 +30,7 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public UserDto createUser(UserDto userDto) {
-
+		ensureEmailAvailable(userDto.getEmail());
 		userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));
 		User user = modelMapper.map(userDto, User.class);
 
@@ -45,6 +47,7 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public UserDto createAdmin(UserDto userDto) {
+		ensureEmailAvailable(userDto.getEmail());
 		userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));
 		User user = modelMapper.map(userDto, User.class);
 
@@ -54,6 +57,13 @@ public class UserServiceImpl implements UserService {
 		User savedUser = userRespository.save(user);
 
 		return modelMapper.map(savedUser, UserDto.class);
+	}
+
+	private void ensureEmailAvailable(String email) {
+		if (userRespository.findByEmail(email).isPresent()) {
+			throw new ResponseStatusException(
+					HttpStatus.CONFLICT, "An account with this email already exists. Please log in instead.");
+		}
 	}
 
 }

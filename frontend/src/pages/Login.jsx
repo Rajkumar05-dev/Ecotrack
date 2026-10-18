@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Mail, Lock, ArrowRight, Loader, Leaf, HelpCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader, Leaf } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +11,8 @@ const Login = () => {
   const [error, setError] = useState('');
   const { loginSession } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const notice = location.state?.notice;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,17 +28,15 @@ const Login = () => {
       const response = await api.login(email, password);
       loginSession(response.token, response.userDto);
       const isAdmin = response.userDto?.role?.appRole?.includes('ADMIN');
-      navigate(isAdmin ? '/admin-dashboard' : '/dashboard');
+      const returnTo = location.state?.from;
+      navigate(!isAdmin && returnTo === '/workshops'
+        ? returnTo
+        : isAdmin ? '/admin-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUseMock = (mockEmail) => {
-    setEmail(mockEmail);
-    setPassword('any-password'); // Mock bypass
   };
 
   return (
@@ -59,6 +59,21 @@ const Login = () => {
             Log in to monitor your carbon footprint and schedule collection requests.
           </p>
         </div>
+
+        {notice && (
+          <div role="status" style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            color: 'var(--primary)',
+            padding: '12px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '0.85rem',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            {notice}
+          </div>
+        )}
 
         {error && (
           <div style={{
@@ -124,42 +139,6 @@ const Login = () => {
             )}
           </button>
         </form>
-
-        {/* Demo Fallback Box */}
-        <div style={{
-          marginTop: '24px',
-          padding: '16px',
-          borderRadius: 'var(--radius-md)',
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid var(--dark-border)',
-          fontSize: '0.8rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--primary)', fontWeight: 600 }}>
-            <HelpCircle size={14} />
-            <span>Need Quick Sandbox Logins?</span>
-          </div>
-          <p style={{ margin: '0 0 10px 0', color: 'var(--text-secondary-dark)', lineHeight: 1.4 }}>
-            If the Spring Boot MySQL server is not running locally, click below to log in with simulated credentials:
-          </p>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button 
-              type="button" 
-              onClick={() => handleUseMock('raj@ecotrack.com')} 
-              className="btn btn-secondary" 
-              style={{ flex: 1, padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }}
-            >
-              Role User
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleUseMock('admin@ecotrack.com')} 
-              className="btn btn-secondary" 
-              style={{ flex: 1, padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }}
-            >
-              Role Admin
-            </button>
-          </div>
-        </div>
 
         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.85rem', color: 'var(--text-secondary-dark)', margin: '24px 0 0 0' }}>
           Don't have an account? <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>Register here</Link>

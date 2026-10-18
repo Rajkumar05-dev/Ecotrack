@@ -2,6 +2,7 @@ package com.learn.ecotrack.Dtos;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.learn.ecotrack.Entities.RecycleRequest;
 import com.learn.ecotrack.Entities.Role;
 
@@ -25,7 +26,8 @@ public class UserDto {
 	
 	private  String email;
 	
-	private  String password;
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+	private String password;
 	
 	private String phoneNo;
 	

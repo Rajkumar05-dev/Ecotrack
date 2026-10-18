@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,6 +42,7 @@ public class User implements UserDetails {
 	@Column(nullable = false,unique = true)
 	private  String email;
 	@Column(nullable = false,unique = false)
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
 	private  String password;
 	@Column(nullable = false)
 	private String phoneNo;

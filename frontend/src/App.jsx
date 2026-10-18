@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthContext, useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -11,43 +12,53 @@ import Workshops from './pages/Workshops';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
-// Authentication Context
-const AuthContext = createContext(null);
+const readStoredSession = () => {
+  const token = localStorage.getItem('ecotrack_token');
+  const storedUser = localStorage.getItem('ecotrack_user');
+  if (!token || !storedUser) {
+    return { token: null, user: null };
+  }
+
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) {
+      throw new Error('Invalid token');
+    }
+    const base64Payload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = base64Payload.padEnd(Math.ceil(base64Payload.length / 4) * 4, '=');
+    const decoded = JSON.parse(atob(paddedPayload));
+    if (!Number.isFinite(decoded.exp) || decoded.exp * 1000 <= Date.now()) {
+      throw new Error('Expired token');
+    }
+
+    return { token, user: JSON.parse(storedUser) };
+  } catch {
+    localStorage.removeItem('ecotrack_token');
+    localStorage.removeItem('ecotrack_user');
+    return { token: null, user: null };
+  }
+};
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Restore authentication session from localStorage
-    const savedToken = localStorage.getItem('ecotrack_token');
-    const savedUser = localStorage.getItem('ecotrack_user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
-  }, []);
+  const [session, setSession] = useState(readStoredSession);
+  const { user, token } = session;
+  const loading = false;
 
   const loginSession = (tokenVal, userVal) => {
     localStorage.setItem('ecotrack_token', tokenVal);
     localStorage.setItem('ecotrack_user', JSON.stringify(userVal));
-    setToken(tokenVal);
-    setUser(userVal);
+    setSession({ token: tokenVal, user: userVal });
   };
 
   const logoutSession = () => {
     localStorage.removeItem('ecotrack_token');
     localStorage.removeItem('ecotrack_user');
-    setToken(null);
-    setUser(null);
+    setSession({ token: null, user: null });
   };
 
   const updateCurrentUser = (updatedUser) => {
     localStorage.setItem('ecotrack_user', JSON.stringify(updatedUser));
-    setUser(updatedUser);
+    setSession(current => ({ ...current, user: updatedUser }));
   };
 
   return (
@@ -56,8 +67,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);
 
 // Guard route for authenticated users
 const ProtectedRoute = ({ children, allowedRoles }) => {

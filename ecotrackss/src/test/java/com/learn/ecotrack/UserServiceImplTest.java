@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;// j   unit testing  
@@ -16,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.learn.ecotrack.Dtos.UserDto;
 import com.learn.ecotrack.Entities.Role;
@@ -64,6 +67,7 @@ public class UserServiceImplTest {
 
 	@Test
 	public void registerUserTest() {
+		when(userRespository.findByEmail(userDto.getEmail())).thenReturn(Optional.empty());
 		when(passwordEncoder.encode("User@123")).thenReturn("encodedpassword");
 		when(modelMapper.map(userDto, User.class)).thenReturn(user);
 		when(roleRepository.findByAppRole(AppRole.ROLE_USER)).thenReturn(Optional.of(role));
@@ -76,6 +80,7 @@ public class UserServiceImplTest {
 
 	@Test
 	public void registerUserRoleNotPresent() {
+		when(userRespository.findByEmail(userDto.getEmail())).thenReturn(Optional.empty());
 		when(passwordEncoder.encode(anyString())).thenReturn("encodedpassword");
 		when(modelMapper.map(userDto, User.class)).thenReturn(user);
 		when(roleRepository.findByAppRole(AppRole.ROLE_USER)).thenReturn(Optional.empty());
@@ -85,6 +90,19 @@ public class UserServiceImplTest {
 		});
 		assertEquals("Role not found", exception.getMessage());
 
+	}
+
+	@Test
+	void registerUserWithExistingEmailReturnsConflict() {
+		when(userRespository.findByEmail(userDto.getEmail())).thenReturn(Optional.of(user));
+
+		ResponseStatusException exception = assertThrows(
+				ResponseStatusException.class, () -> userService.createUser(userDto));
+
+		assertEquals(409, exception.getStatusCode().value());
+		assertEquals("An account with this email already exists. Please log in instead.", exception.getReason());
+		verify(userRespository, never()).save(user);
+		verify(passwordEncoder, never()).encode(anyString());
 	}
 
 }

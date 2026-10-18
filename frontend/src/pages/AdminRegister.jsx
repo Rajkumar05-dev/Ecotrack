@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { User, Mail, Lock, Phone, Shield, ArrowRight, Loader, AlertCircle, CheckCircle } from 'lucide-react';
@@ -80,10 +80,7 @@ const AdminRegister = () => {
     if (value.length < 6) {
       return 'Admin code must be at least 6 characters';
     }
-    // In a real app, validate against backend
-    if (value !== 'ADMIN2026') {
-      return 'Invalid admin code';
-    }
+    // Backend will verify the actual admin code
     return '';
   };
 
@@ -395,7 +392,7 @@ const AdminRegister = () => {
               />
             </div>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary-dark)', marginTop: '4px', display: 'block' }}>
-              Required code: ADMIN2026 (demo)
+              Contact your system administrator for the admin code
             </span>
             {errors.adminCode && (
               <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>

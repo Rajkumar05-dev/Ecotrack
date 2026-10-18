@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { 
-  Recycle, Calendar, User, ShieldAlert, Plus, Upload, CheckCircle2, 
-  XCircle, Clock, BarChart3, Settings, HelpCircle, FileText, Loader, ArrowUpRight 
+  Recycle, Calendar, User, ShieldAlert, Plus, Upload, XCircle,
+  BarChart3, HelpCircle, Loader, ArrowUpRight
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, updateCurrentUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [recycleRequests, setRecycleRequests] = useState([]);
@@ -17,7 +17,6 @@ const Dashboard = () => {
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [requestLoadError, setRequestLoadError] = useState('');
 
   // Form State for new Request
   const [itemType, setItemType] = useState('Plastic Bottles');
@@ -36,18 +35,12 @@ const Dashboard = () => {
 
   const isAdmin = user?.role?.appRole?.includes('ADMIN');
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user?.id) {
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
       if (isAdmin) {
         const adminData = await api.getAllRecycleRequestsAdmin();
         setAdminRequests(adminData);
@@ -59,10 +52,8 @@ const Dashboard = () => {
             throw new Error('Unexpected user requests response');
           }
           setRecycleRequests(userReqs);
-          setRequestLoadError('');
         } catch (e) {
           console.error('Error loading user recycle requests:', e);
-          setRequestLoadError('Unable to load your pickup history at the moment.');
           const mockRequests = await api.getAllRecycleRequestsAdmin();
           const filtered = mockRequests.filter(r => r.user?.id === user.id);
           setRecycleRequests(filtered.length > 0 ? filtered : (user.recycleRequests || []));
@@ -79,7 +70,13 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, user]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      fetchData();
+    });
+  }, [fetchData]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -184,8 +181,7 @@ const Dashboard = () => {
   // User Stats Calculation
   const approvedRequests = recycleRequests.filter(r => r.requestStatus === 'APPROVED');
   const pendingRequests = recycleRequests.filter(r => r.requestStatus === 'PENDING');
-  const rejectedRequests = recycleRequests.filter(r => r.requestStatus === 'REJECTED');
-  
+
   const totalItemsRecycled = approvedRequests.reduce((acc, curr) => acc + curr.quantity, 0);
   const carbonOffset = (totalItemsRecycled * 0.14).toFixed(1); // 0.14kg CO2 saved per item
 

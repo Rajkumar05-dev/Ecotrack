@@ -33,6 +33,14 @@ public class WorkShopControllerTest {
 	}
 
 	@Test
+	void paymentConfirmationCanReachSignatureValidationWithoutLogin() throws Exception {
+		mockMvc.perform(post("/enroll/confirm")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	@WithMockUser(username = "user", password = "password", roles = { "ADMIN" })
 	void testCreateWorkShop() throws Exception {
 		WorkShopDto workShopDto = new WorkShopDto();

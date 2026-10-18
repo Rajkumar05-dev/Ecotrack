@@ -51,7 +51,7 @@ public class AuthController {
 		}
 		catch(BadCredentialsException badCredentialsException)
 		{
-			System.out.println("Bad Credentials");
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
 		
 		
@@ -76,6 +76,5 @@ public class AuthController {
 	
 
 }
-
 
 
